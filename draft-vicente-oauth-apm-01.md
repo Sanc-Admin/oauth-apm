@@ -35,7 +35,7 @@ author:
     ins: B. Vicente
     name: Brian Vicente
     organization: Sanctum SecOps LLC
-    email: bvicente@sanctumsecops.com
+    email: brian@sanctumsecops.io
     city: Pine City
     region: NY
     country: United States of America
