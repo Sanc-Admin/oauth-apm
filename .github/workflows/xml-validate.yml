@@ -25,6 +25,14 @@ jobs:
       - name: Install xml2rfc
         run: pip install xml2rfc
 
+      - name: Restore xml2rfc reference cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/xml2rfc
+          key: xml2rfc-bibxml-${{ hashFiles('**/*.xml') }}
+          restore-keys: |
+            xml2rfc-bibxml-
+
       - name: Validate all XML drafts
         run: |
           shopt -s nullglob
