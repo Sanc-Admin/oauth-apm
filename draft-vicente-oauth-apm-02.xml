@@ -4,7 +4,7 @@
 ]>
 <rfc xmlns:xi="http://www.w3.org/2001/XInclude"
      category="info"
-     docName="draft-vicente-oauth\-apm-02"
+     docName="draft-vicente-oauth-apm-02"
      ipr="trust200902"
      submissionType="IETF"
      xml:lang="en"
@@ -13,7 +13,7 @@
   <front>
     <title abbrev="OAuth APM">Authorization Posture Mechanism (APM) for OAuth 2.0</title>
 
-    <seriesInfo name="Internet-Draft" value="draft-vicente-oauth\-apm-02"/>
+    <seriesInfo name="Internet-Draft" value="draft-vicente-oauth-apm-02"/>
 
     <author initials="B." surname="Vicente" fullname="Brian Vicente">
       <organization>Sanctum SecOps LLC</organization>
