@@ -620,14 +620,14 @@
           close the APM gap because:
         </t>
         <ul spacing="normal">
-          <li><strong>Per-request sender-constraining</strong> (<xref target="RFC8705"/>, <xref target="RFC9449"/>): Proves key
-          possession but does not evaluate device posture.</li>
-          <li><strong>Fine-grained initial grants</strong> (<xref target="RFC9396"/>): Precise at issuance but
-          static thereafter.</li>
-          <li><strong>Reactive step-up</strong> (<xref target="RFC9470"/>): Binary, fires on authentication-level
-          failures only, does not address device posture.</li>
-          <li><strong>Asynchronous push events</strong> (<xref target="CAEP"/>): Not synchronous with individual
-          requests, binary compliance vocabulary, no normative graduated outcomes.</li>
+          <li><t><strong>Per-request sender-constraining</strong> (<xref target="RFC8705"/>, <xref target="RFC9449"/>): Proves key
+          possession but does not evaluate device posture.</t></li>
+          <li><t><strong>Fine-grained initial grants</strong> (<xref target="RFC9396"/>): Precise at issuance but
+          static thereafter.</t></li>
+          <li><t><strong>Reactive step-up</strong> (<xref target="RFC9470"/>): Binary, fires on authentication-level
+          failures only, does not address device posture.</t></li>
+          <li><t><strong>Asynchronous push events</strong> (<xref target="CAEP"/>): Not synchronous with individual
+          requests, binary compliance vocabulary, no normative graduated outcomes.</t></li>
         </ul>
         <t>
           None of these mechanisms defines: (a) the per-request triple of certificate,
@@ -691,17 +691,17 @@
         privilege principle. Outcome classes SHOULD include at minimum:
       </t>
       <ul spacing="normal">
-        <li><strong>Permit</strong>: The Consistency View is consistent with the Issuance Posture;
-        the request proceeds under the full authorization of the access token.</li>
-        <li><strong>Scope Reduction</strong>: One or more posture attributes are degraded but the
+        <li><t><strong>Permit</strong>: The Consistency View is consistent with the Issuance Posture;
+        the request proceeds under the full authorization of the access token.</t></li>
+        <li><t><strong>Scope Reduction</strong>: One or more posture attributes are degraded but the
         degradation does not warrant full denial; the request proceeds under a
-        narrower effective scope.</li>
-        <li><strong>Method Restriction</strong>: Posture degradation warrants restricting permitted
+        narrower effective scope.</t></li>
+        <li><t><strong>Method Restriction</strong>: Posture degradation warrants restricting permitted
         HTTP methods or operation types; the request proceeds only if the requested
-        method is within the restricted set.</li>
-        <li><strong>Full Denial</strong>: Posture degradation is sufficiently severe that no
+        method is within the restricted set.</t></li>
+        <li><t><strong>Full Denial</strong>: Posture degradation is sufficiently severe that no
         operation is permitted; the request is denied with an error response that
-        includes actionable guidance for the client.</li>
+        includes actionable guidance for the client.</t></li>
       </ul>
 
       <t>
@@ -776,16 +776,16 @@
           The APM mechanism operates at three points in the OAuth request lifecycle:
         </t>
         <ol spacing="normal">
-          <li><strong>Token Issuance</strong> (Authorization Server): The AS records the Issuance
-          Posture alongside the issued token.</li>
-          <li><strong>Request Processing</strong> (Resource Server / PEP): For each Privileged
+          <li><t><strong>Token Issuance</strong> (Authorization Server): The AS records the Issuance
+          Posture alongside the issued token.</t></li>
+          <li><t><strong>Request Processing</strong> (Resource Server / PEP): For each Privileged
           Request, the RS or PEP assembles the Consistency View, evaluates it against
-          the Issuance Posture, and determines the outcome class.</li>
-          <li><strong>Outcome Conveyance</strong> (Resource Server / PEP to Client): The RS or PEP
+          the Issuance Posture, and determines the outcome class.</t></li>
+          <li><t><strong>Outcome Conveyance</strong> (Resource Server / PEP to Client): The RS or PEP
           returns either a normal response (for Permit outcomes) or a structured error
           response (for Scope Reduction, Method Restriction, or Full Denial outcomes)
           that enables the client to understand its effective permission set and, if
-          applicable, to take corrective action.</li>
+          applicable, to take corrective action.</t></li>
         </ol>
       </section>
 
@@ -884,26 +884,26 @@
           The evaluation proceeds in the following order:
         </t>
         <ol spacing="normal">
-          <li><strong>Sender constraint verification</strong>: Verify that the certificate or key
+          <li><t><strong>Sender constraint verification</strong>: Verify that the certificate or key
           thumbprint in the Consistency View matches the <tt>cnf</tt> claim in the token.
           If this verification fails, the request MUST be denied with HTTP 401 and
           <tt>invalid_token</tt> error, as per <xref target="RFC8705"/> or <xref target="RFC9449"/>. APM processing
-          does not proceed for requests that fail sender constraint verification.</li>
-          <li><strong>Posture signal verification</strong>: Verify the integrity protection of the
+          does not proceed for requests that fail sender constraint verification.</t></li>
+          <li><t><strong>Posture signal verification</strong>: Verify the integrity protection of the
           device-posture signal. If the signal is absent or integrity verification
           fails, the enforcing entity SHOULD treat the current posture as unknown.
-          An unknown posture SHOULD be mapped to a degraded outcome class by policy.</li>
-          <li><strong>Issuance Posture retrieval</strong>: Retrieve the Issuance Posture from the token
+          An unknown posture SHOULD be mapped to a degraded outcome class by policy.</t></li>
+          <li><t><strong>Issuance Posture retrieval</strong>: Retrieve the Issuance Posture from the token
           claim or server-side metadata as appropriate for the deployment's recording
-          strategy.</li>
-          <li><strong>Degradation vector computation</strong>: For each posture attribute dimension
+          strategy.</t></li>
+          <li><t><strong>Degradation vector computation</strong>: For each posture attribute dimension
           covered by the Issuance Posture, determine whether the current value is
           equal to, better than, or worse than the issuance-time value. The set of
-          dimensions that have degraded constitutes the degradation vector.</li>
-          <li><strong>Outcome class determination</strong>: Map the degradation vector to an outcome
+          dimensions that have degraded constitutes the degradation vector.</t></li>
+          <li><t><strong>Outcome class determination</strong>: Map the degradation vector to an outcome
           class using the deployment's policy. The policy MUST be designed such that:
             <ul spacing="normal">
-              <li>A zero-degradation vector maps to the Permit outcome.</li>
+              <li>A zero-degradation vector maps to the Permit outcome.</t></li>
               <li>An increase in the severity of the degradation vector monotonically
               increases the restrictiveness of the outcome class.</li>
               <li>The outcome class for a given degradation vector is the same regardless
