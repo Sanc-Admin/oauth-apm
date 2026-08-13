@@ -1,0 +1,157 @@
+{
+  "_schema": "sanctum-apm-evidence-v1",
+  "_generated": "2026-08-12T20:42:00Z",
+  "_author": "Brian Vicente <bvicente@sanctumsecops.com>",
+  "_orcid": "https://orcid.org/0009-0006-6395-5308",
+  "_organization": "Sanctum SecOps LLC",
+  "_ipr_notice": "Subject matter in this document is the subject of pending or intended United States patent applications by Sanctum SecOps LLC / Brian Vicente. This evidence file is published under IETF BCP 78/79 submission rights. No license to implement is granted by publication of this file.",
+  "draft_series": "draft-vicente-oauth-apm",
+  "current_revision": "-03",
+  "zenodo_doi": "https://doi.org/10.5281/zenodo.20584241",
+  "github_repo": "https://github.com/Sanc-Admin/oauth-apm",
+  "gaps": [
+    {
+      "id": "gap-a",
+      "title": "No Per-Request Triple Consistency Verification",
+      "introduced_in": "-01",
+      "status": "open",
+      "evidence": [
+        {
+          "source": "RFC8705",
+          "section": "6.5",
+          "quote": "This document does not define how the authorization server should determine the client's certificate during token introspection.",
+          "relevance": "RFC 8705 explicitly excludes revocation re-evaluation and does not define per-request triple evaluation."
+        },
+        {
+          "source": "RFC9449",
+          "section": "11.7",
+          "quote": "DPoP does not ensure the integrity of the request payload or any request headers.",
+          "relevance": "RFC 9449 limits proof to method and URI; no device-posture dimension."
+        },
+        {
+          "source": "RFC9449",
+          "section": "11.11",
+          "quote": "Cryptographic binding between DPoP and client authentication mechanisms is out of scope.",
+          "relevance": "No normative mechanism binds DPoP to a device-posture signal."
+        }
+      ],
+      "requirements": ["REQ-1", "REQ-2", "REQ-3"]
+    },
+    {
+      "id": "gap-b",
+      "title": "No Graduated Least-Privilege Outcomes",
+      "introduced_in": "-01",
+      "status": "open",
+      "evidence": [
+        {
+          "source": "RFC9470",
+          "section": "2",
+          "quote": "The resource server MUST respond with an HTTP 401 status code.",
+          "relevance": "RFC 9470 defines only binary deny; no graduated outcome pathway."
+        },
+        {
+          "source": "RFC9396",
+          "section": "5.3",
+          "quote": "The authorization_details claim in an issued token represents the authorization at the time of issuance.",
+          "relevance": "RFC 9396 authorization_details is static post-issuance; no per-request narrowing."
+        }
+      ],
+      "requirements": ["REQ-4", "REQ-7"]
+    },
+    {
+      "id": "gap-c",
+      "title": "No Method-Level Downgrade on Posture Degradation",
+      "introduced_in": "-01",
+      "status": "open",
+      "evidence": [
+        {
+          "source": "RFC9396",
+          "section": "2.2",
+          "quote": "The actions element is a list of strings representing the actions to be performed.",
+          "relevance": "RFC 9396 actions are issuance-time; no mechanism to restrict HTTP method per-request on posture change."
+        },
+        {
+          "source": "RFC9470",
+          "section": "3",
+          "quote": "The resource server MUST NOT accept the access token for use with other protected resources.",
+          "relevance": "RFC 9470 escalation path does not include method-level restriction as a distinct outcome."
+        }
+      ],
+      "requirements": ["REQ-5"]
+    },
+    {
+      "id": "gap-d",
+      "title": "No Normative Threat-Response Pathway for Cryptographic Threat Events",
+      "introduced_in": "-03",
+      "status": "open",
+      "threat_event_types": [
+        {
+          "type": "hndl_interception",
+          "description": "Harvest-Now-Decrypt-Later passive bulk traffic capture",
+          "minimum_outcome": "method_restriction",
+          "rationale": "HNDL exposes tokens to future CRQC decryption; active token sessions should be restricted to read-only pending re-enrollment with PQ-safe algorithm."
+        },
+        {
+          "type": "algorithm_deprecation",
+          "description": "Algorithm family deprecated by CA, national standards body, or IETF WG consensus",
+          "minimum_outcome": "method_restriction",
+          "error_code": "alg_upgrade_required",
+          "rationale": "Tokens bound to deprecated algorithm families retain structural validity but carry elevated cryptographic risk; method restriction with upgrade advisory is proportionate response."
+        },
+        {
+          "type": "cryptographic_oracle",
+          "description": "Public disclosure of side-channel or fault-injection attack capability against key type in use",
+          "minimum_outcome": "full_denial",
+          "rationale": "Cryptographic oracle attacks can recover private key material; full denial and token revocation are warranted."
+        }
+      ],
+      "evidence": [
+        {
+          "source": "FIPS204",
+          "section": "1",
+          "quote": "This standard specifies ML-DSA, a digital signature algorithm based on the hardness of the Module Learning With Errors (MLWE) problem, intended to be secure against attacks by quantum computers.",
+          "relevance": "FIPS 204 ML-DSA provides the PQ-safe algorithm family toward which Algorithm-Agility Triggers drive re-enrollment."
+        },
+        {
+          "source": "NIST.SP.800-207",
+          "section": "3.2",
+          "quote": "No resource is inherently trusted. Every asset must have its security posture evaluated via a PEP before a request is granted.",
+          "relevance": "ZTA per-request evaluation requirement motivates synchronous threat-event response pathway."
+        },
+        {
+          "source": "Shor1994",
+          "full_citation": "P.W. Shor, 'Algorithms for quantum computation: discrete logarithms and factoring,' Proc. 35th FOCS, 1994, pp. 124-134.",
+          "relevance": "Shor's algorithm breaks RSA/ECDSA in polynomial quantum time; HNDL threat presupposes eventual CRQC availability."
+        }
+      ],
+      "requirements": ["REQ-11", "REQ-12"]
+    }
+  ],
+  "requirements_summary": [
+    {"id": "REQ-1",  "title": "Per-Request Triple Assembly",           "gap": "gap-a", "introduced_in": "-01"},
+    {"id": "REQ-2",  "title": "Issuance Posture Recording",             "gap": "gap-a", "introduced_in": "-01"},
+    {"id": "REQ-3",  "title": "Consistency Evaluation",                 "gap": "gap-a", "introduced_in": "-01"},
+    {"id": "REQ-4",  "title": "Graduated Outcome Production",           "gap": "gap-b", "introduced_in": "-01"},
+    {"id": "REQ-5",  "title": "Method-Level Restriction",               "gap": "gap-c", "introduced_in": "-01"},
+    {"id": "REQ-6",  "title": "Scope Reduction",                        "gap": "gap-b", "introduced_in": "-01"},
+    {"id": "REQ-7",  "title": "Deterministic Outcome Mapping",          "gap": "gap-b", "introduced_in": "-01"},
+    {"id": "REQ-8",  "title": "Integrity-Protected Posture Signal",     "gap": "gap-a", "introduced_in": "-01"},
+    {"id": "REQ-9",  "title": "Backward Compatibility RFC 8705/9449",   "gap": "gap-a", "introduced_in": "-01"},
+    {"id": "REQ-10", "title": "Non-Interference with Revocation",       "gap": "gap-b", "introduced_in": "-01"},
+    {"id": "REQ-11", "title": "Threat-Event Integration",               "gap": "gap-d", "introduced_in": "-03"},
+    {"id": "REQ-12", "title": "Algorithm-Agility Trigger",              "gap": "gap-d", "introduced_in": "-03"}
+  ],
+  "iana_registrations": [
+    {"registry": "OAuth Extensions Error Registry",  "value": "apm_scope_reduced",               "introduced_in": "-01"},
+    {"registry": "OAuth Extensions Error Registry",  "value": "apm_method_restricted",            "introduced_in": "-01"},
+    {"registry": "OAuth Extensions Error Registry",  "value": "insufficient_authorization_posture","introduced_in": "-01"},
+    {"registry": "OAuth Extensions Error Registry",  "value": "alg_upgrade_required",             "introduced_in": "-03"},
+    {"registry": "JWT Claims Registry",              "value": "apm_posture",                      "introduced_in": "-01"},
+    {"registry": "JWT Claims Registry",              "value": "threat_type",                      "introduced_in": "-03"},
+    {"registry": "JWT Claims Registry",              "value": "threat_scope",                     "introduced_in": "-03"},
+    {"registry": "JWT Claims Registry",              "value": "min_outcome",                      "introduced_in": "-03"},
+    {"registry": "APM Threat Event Type Registry (new)", "value": "hndl_interception",           "introduced_in": "-03"},
+    {"registry": "APM Threat Event Type Registry (new)", "value": "algorithm_deprecation",       "introduced_in": "-03"},
+    {"registry": "APM Threat Event Type Registry (new)", "value": "cryptographic_oracle",        "introduced_in": "-03"}
+  ]
+}
