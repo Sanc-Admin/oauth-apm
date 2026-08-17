@@ -1,0 +1,1067 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rfc [
+  <!ENTITY nbsp "&#160;">
+]>
+<rfc xmlns:xi="http://www.w3.org/2001/XInclude"
+     category="info"
+     docName="draft-vicente-oauth-apm-04"
+     ipr="trust200902"
+     submissionType="IETF"
+     xml:lang="en"
+     version="3">
+
+  <front>
+    <title abbrev="OAuth APM">Authorization Posture Mechanism (APM) for OAuth 2.0</title>
+
+    <seriesInfo name="Internet-Draft" value="draft-vicente-oauth-apm-04"/>
+
+    <author initials="B." surname="Vicente" fullname="Brian Vicente">
+      <organization>Sanctum SecOps LLC</organization>
+      <address>
+        <postal>
+          <city>Pine City</city>
+          <region>NY</region>
+          <country>United States of America</country>
+        </postal>
+        <email>brian@sso-labs.com</email>
+        <uri>https://orcid.org/0009-0006-6395-5308</uri>
+      </address>
+    </author>
+
+    <date year="2026" month="August" day="16"/>
+
+    <area>Security</area>
+    <workgroup>Web Authorization Protocol</workgroup>
+
+    <keyword>oauth</keyword>
+    <keyword>authorization</keyword>
+    <keyword>posture</keyword>
+    <keyword>zero trust</keyword>
+    <keyword>device posture</keyword>
+    <keyword>graduated outcome</keyword>
+    <keyword>least privilege</keyword>
+    <keyword>post-quantum</keyword>
+    <keyword>harvest-now-decrypt-later</keyword>
+    <keyword>HNDL</keyword>
+    <keyword>threat response</keyword>
+
+    <abstract>
+      <t>
+        OAuth 2.0 access tokens encode an authorization decision made at issuance time.
+        Sender-constraining mechanisms such as Mutual-TLS certificate binding
+        (<xref target="RFC8705"/>) and Demonstrating Proof of Possession (<xref target="RFC9449"/>)
+        extend this model by proving key possession at request time, but neither mechanism
+        re-evaluates the full security context against the conditions present at token
+        issuance, nor provides a normative pathway for graduated least-privilege outcomes
+        when that context has degraded.
+      </t>
+      <t>
+        This document describes the Authorization Posture Mechanism (APM) problem domain
+        and specifies requirements for a mechanism that assembles a per-request Consistency
+        View, evaluates it against the Issuance Posture, and produces graduated,
+        least-privilege outcomes proportional to posture degradation. This revision (-03)
+        adds Gap D: the absence of a normative threat-response pathway for active
+        cryptographic threat events — including Harvest-Now-Decrypt-Later (HNDL)
+        interception signals and post-quantum algorithm-agility triggers — and
+        introduces REQ-11 (Threat-Event Integration) and REQ-12
+        (Algorithm-Agility Trigger) accordingly.
+      </t>
+    </abstract>
+
+    <note title="Source and Archival" removeInRFC="true">
+      <t>
+        Source for this draft is maintained at
+        <eref target="https://github.com/Sanc-Admin/oauth-apm">https://github.com/Sanc-Admin/oauth-apm</eref>.
+        A citable archival version of this document is available at Zenodo:
+        <eref target="https://doi.org/10.5281/zenodo.20584241">https://doi.org/10.5281/zenodo.20584241</eref>.
+        Author ORCID iD:
+        <eref target="https://orcid.org/0009-0006-6395-5308">https://orcid.org/0009-0006-6395-5308</eref>.
+      </t>
+      <t>
+        Discussion of this document occurs on the IETF "oauth" mailing list
+        (oauth@ietf.org). Issues and pull requests may be filed at the GitHub
+        repository linked above.
+      </t>
+    </note>
+
+    <note title="IPR Considerations" removeInRFC="true">
+      <t>
+        Sanctum IP Co (a Delaware corporation, assignee of Sanctum SecOps LLC) has filed or
+        intends to file United States patent applications
+        covering subject matter described in this document, including but not limited
+        to the per-request triple Consistency View assembly, graduated outcome
+        production, threat-event integration (Gap D / REQ-11), and algorithm-agility
+        trigger mechanisms (REQ-12). By posting this Internet-Draft, the author submits
+        to the IETF Trust the rights described in Section 5 of BCP 78 and BCP 79.
+        Patent licensing terms are not yet known. Implementers and reviewers MUST
+        consult the IETF Datatracker IPR disclosure page for this document for current
+        disclosure status before implementation.
+      </t>
+          <t>
+        All intellectual property described in this document is owned by
+        Sanctum IP Co, 128 Dry Run Rd, Pine City, NY 14871.
+        Contact: brian@sso-labs.com.
+      </t>
+</note>
+
+  </front>
+
+  <middle>
+
+    <!-- Section 1: Introduction -->
+    <section anchor="introduction" numbered="true">
+      <name>Introduction</name>
+
+      <section anchor="motivation" numbered="true">
+        <name>Background and Motivation</name>
+        <t>
+          Zero Trust Architecture, as defined in NIST SP 800-207 <xref target="NIST.SP.800-207"/>,
+          requires that access to resources be granted on a per-request basis using dynamic
+          policy that includes the observable state of the client identity, the requesting
+          asset, and behavioral or environmental attributes.
+        </t>
+        <t>
+          The OAuth 2.0 framework <xref target="RFC6749"/> issues access tokens that represent an
+          authorization decision frozen at the moment of issuance. Revisions -01 and -02
+          of this document identified three gaps (A, B, C) in the existing OAuth
+          sender-constraining ecosystem with respect to ZTA per-request evaluation. This
+          revision (-03) identifies a fourth gap (Gap D) specifically concerning active
+          cryptographic threat events that require an immediate, normative APM response
+          pathway distinct from the posture-degradation model of Gaps A-C.
+        </t>
+      </section>
+
+      <section anchor="adjacent-gaps" numbered="true">
+        <name>Gaps in Adjacent Mechanisms</name>
+
+        <section anchor="gap-step-up" numbered="true">
+          <name>Step-Up Authentication (RFC 9470)</name>
+          <t>
+            RFC 9470 <xref target="RFC9470"/> defines the <tt>insufficient_user_authentication</tt>
+            error code and a <tt>WWW-Authenticate</tt> challenge mechanism. This mechanism is
+            reactive, addresses authentication strength only, and its outcome is binary.
+          </t>
+        </section>
+
+        <section anchor="gap-rar" numbered="true">
+          <name>Rich Authorization Requests (RFC 9396)</name>
+          <t>
+            RFC 9396 <xref target="RFC9396"/> defines <tt>authorization_details</tt> for fine-grained
+            issuance-time grants. The claim is static for the token's lifetime. No
+            mechanism exists for per-request narrowing in response to a runtime posture
+            signal or threat event.
+          </t>
+        </section>
+
+        <section anchor="gap-caep" numbered="true">
+          <name>Continuous Access Evaluation (CAEP)</name>
+          <t>
+            OpenID CAEP <xref target="CAEP"/> defines asynchronous push events for compliance
+            change. CAEP does not provide a per-request, in-band posture assertion or
+            a normative threat-event response pathway.
+          </t>
+        </section>
+
+        <section anchor="gap-attestation" numbered="true">
+          <name>Attestation-Based Client Authentication</name>
+          <t>
+            <xref target="I-D.ietf-oauth-attestation-based-client-auth"/> defines a two-token
+            attestation structure. The Client Attestation JWT may be reused across requests
+            until its <tt>exp</tt> claim, with no normative mechanism to force fresh attestation
+            on a cryptographic threat event.
+          </t>
+        </section>
+
+      </section>
+
+      <section anchor="relationship" numbered="true">
+        <name>Relationship to This Document</name>
+        <t>
+          This document defines the APM problem domain and specifies functional
+          requirements for a mechanism addressing four identified gaps:
+        </t>
+        <ol spacing="normal">
+          <li>
+            <t><strong>Gap A</strong> <xref target="gap-a"/>: No per-request triple consistency verification.</t>
+          </li>
+          <li>
+            <t><strong>Gap B</strong> <xref target="gap-b"/>: No graduated least-privilege outcomes.</t>
+          </li>
+          <li>
+            <t><strong>Gap C</strong> <xref target="gap-c"/>: No method-level downgrade on posture degradation.</t>
+          </li>
+          <li>
+            <t><strong>Gap D</strong> <xref target="gap-d"/>: No normative threat-response pathway for active
+            cryptographic threat events including HNDL interception signals and
+            post-quantum algorithm-agility triggers.</t>
+          </li>
+        </ol>
+
+        <section anchor="gap-a" numbered="false">
+          <name>Gap A: No Per-Request Triple Consistency Verification</name>
+          <t>
+            No normative mechanism evaluates the certificate, bound token, and device-posture
+            signal together per-request.
+          </t>
+        </section>
+
+        <section anchor="gap-b" numbered="false">
+          <name>Gap B: No Graduated Least-Privilege Outcomes</name>
+          <t>
+            No normative mechanism responds to posture degradation with anything other than
+            a binary allow/deny decision.
+          </t>
+        </section>
+
+        <section anchor="gap-c" numbered="false">
+          <name>Gap C: No Method-Level Downgrade on Posture Degradation</name>
+          <t>
+            No normative mechanism restricts permitted HTTP methods or operation types for
+            an existing valid token in response to a runtime posture change.
+          </t>
+        </section>
+
+        <section anchor="gap-d" numbered="false">
+          <name>Gap D: No Normative Threat-Response Pathway for Cryptographic Threat Events</name>
+          <t>
+            No existing OAuth mechanism defines a normative pathway by which an active
+            cryptographic threat event — specifically a Harvest-Now-Decrypt-Later (HNDL)
+            interception signal detected by a network security monitor, or a post-quantum
+            algorithm-agility trigger indicating that the algorithm family used in a
+            currently bound token's <tt>cnf</tt> key or certificate is being deprecated — can
+            cause an immediate, synchronous, per-request graduated outcome rather than
+            relying solely on asynchronous revocation or manual re-enrollment.
+          </t>
+          <t>
+            Gap D differs from Gaps A-C in that it concerns active external threat signals
+            — not device-posture degradation — as the driver of the outcome class. The
+            posture degradation model of Gaps A-C assumes degradation is detectable via
+            device-side posture attributes. Gap D covers the class of threat events that
+            are detected by network-layer or cryptographic-layer monitors external to the
+            device, where the device itself may report a clean posture signal while the
+            session is actively under threat.
+          </t>
+        </section>
+
+      </section>
+
+      <section anchor="pq-relevance" numbered="true">
+        <name>Post-Quantum Relevance</name>
+        <t>
+          Shor's algorithm <xref target="SHOR1994"/> solves the Integer Factorization Problem
+          (IFP) and the Elliptic Curve Discrete Logarithm Problem (ECDLP) in polynomial
+          quantum time. The Harvest-Now-Decrypt-Later (HNDL) threat amplifies urgency:
+          an adversary recording TLS sessions today can retroactively recover session
+          keys once a Cryptographically Relevant Quantum Computer (CRQC) is available,
+          recovering the access tokens exchanged within those sessions.
+        </t>
+        <t>
+          Gap D addresses the scenario in which an HNDL interception event is detected
+          during an active token's lifetime — for example, via traffic analysis indicating
+          that a session was bulk-captured by a network adversary — and a normative,
+          synchronous APM response is required. The existing OAuth ecosystem provides no
+          mechanism for such a signal to immediately affect the per-request authorization
+          outcome for active tokens without full revocation of the token.
+        </t>
+        <t>
+          The APM mechanism is algorithm-agnostic: the certificate component of the
+          Consistency View is compatible with ML-DSA certificates defined in
+          <xref target="FIPS204"/> as well as current ECDSA certificates. Gap D's REQ-12
+          (Algorithm-Agility Trigger) formalizes the requirement that an algorithm-family
+          deprecation event can serve as a threat-event driver for immediate outcome
+          escalation.
+        </t>
+      </section>
+
+    </section>
+
+    <!-- Section 2: Conventions and Definitions -->
+    <section anchor="conventions" numbered="true">
+      <name>Conventions and Definitions</name>
+
+      <t>
+        The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+        "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+        "OPTIONAL" in this document are to be interpreted as described in
+        BCP 14 <xref target="RFC2119"/> <xref target="RFC8174"/> when, and only when, they appear in
+        all capitals, as shown here.
+      </t>
+
+      <dl newline="true" spacing="normal">
+
+        <dt>Access Token:</dt>
+        <dd>A credential issued by an authorization server to a client per <xref target="RFC6749"/> §1.4.
+        All access tokens in APM deployments are assumed to be sender-constrained via
+        <xref target="RFC8705"/> or <xref target="RFC9449"/> or both.</dd>
+
+        <dt>Algorithm-Agility Trigger:</dt>
+        <dd>A threat event indicating that the cryptographic algorithm family used in a
+        token's <tt>cnf</tt> key or bound certificate has been deprecated or is under active
+        attack. An Algorithm-Agility Trigger is a subclass of Threat Event for the
+        purposes of Gap D and REQ-12.</dd>
+
+        <dt>Consistency View:</dt>
+        <dd>The triple of (a) the TLS client certificate or DPoP public key presented with
+        a request, (b) the bound access token's claims, and (c) the device-posture
+        signal supplied with the request. Assembled per-request at the RS or PEP.
+        For Gap D processing, the Consistency View is extended to include (d) any
+        active Threat-Event Signal associated with the session or token.</dd>
+
+        <dt>Device-Posture Signal:</dt>
+        <dd>An integrity-protected assertion about the security state of the device from
+        which the request originates.</dd>
+
+        <dt>Graduated Outcome:</dt>
+        <dd>A result of Consistency View evaluation that is neither unconditional access
+        nor unconditional denial. Graduated outcomes include Permit, Scope Reduction,
+        Method Restriction, and Full Denial.</dd>
+
+        <dt>Harvest-Now-Decrypt-Later (HNDL):</dt>
+        <dd>A threat model in which an adversary records encrypted traffic today with
+        the intent of decrypting it using a future Cryptographically Relevant Quantum
+        Computer (CRQC). An HNDL Interception Signal is a Threat Event indicating
+        that a session's traffic has likely been bulk-captured by a network adversary.</dd>
+
+        <dt>Issuance Posture:</dt>
+        <dd>A representation of the security posture of the client and its device at
+        token issuance, recorded by the AS for per-request comparison.</dd>
+
+        <dt>Method Restriction:</dt>
+        <dd>A Graduated Outcome limiting permitted HTTP methods or operation types.</dd>
+
+        <dt>Policy Enforcement Point (PEP):</dt>
+        <dd>A component evaluating the Consistency View and applying the graduated
+        outcome per <xref target="NIST.SP.800-207"/> §3.</dd>
+
+        <dt>Posture Degradation:</dt>
+        <dd>The condition in which one or more attributes of the current device-posture
+        signal are less secure than the Issuance Posture attributes.</dd>
+
+        <dt>Resource Server (RS):</dt>
+        <dd>The server hosting protected resources per <xref target="RFC6749"/> §1.1.</dd>
+
+        <dt>Scope Reduction:</dt>
+        <dd>A Graduated Outcome substituting a narrower effective scope, implemented
+        at the RS/PEP layer without modifying the token.</dd>
+
+        <dt>Threat Event:</dt>
+        <dd>A signal from a network-layer or cryptographic-layer monitor, external to
+        the device, indicating that an active session or token is under a cryptographic
+        threat that the device-side posture signal does not and cannot reflect. Threat
+        Events include but are not limited to HNDL Interception Signals and
+        Algorithm-Agility Triggers.</dd>
+
+        <dt>Threat-Event Signal:</dt>
+        <dd>An integrity-protected, machine-readable notification of a Threat Event,
+        delivered to the RS or PEP via a Threat-Event Integration channel as defined
+        in REQ-11. The Threat-Event Signal MUST be integrity-protected and MUST
+        identify the token, session, or client to which the threat applies.</dd>
+
+      </dl>
+
+    </section>
+
+    <!-- Section 3: Problem Statement -->
+    <section anchor="problem-statement" numbered="true">
+      <name>Problem Statement</name>
+
+      <section anchor="prob-static" numbered="true">
+        <name>The Static Authorization Problem</name>
+        <t>
+          RFC 6749 <xref target="RFC6749"/> issues access tokens representing an authorization
+          decision frozen at issuance. NIST SP 800-207 Tenet 6 requires: "All resource
+          authentication and authorization are dynamic and strictly enforced before access
+          is allowed." This requirement cannot be satisfied by a token whose authorization
+          context was frozen at issuance.
+        </t>
+      </section>
+
+      <section anchor="prob-single-dim" numbered="true">
+        <name>The Single-Dimension Binding Problem</name>
+        <t>
+          Both <xref target="RFC8705"/> and <xref target="RFC9449"/> extend the static token model by adding a
+          sender-constraint dimension but remain single-dimension. They do not evaluate
+          certificate revocation, device compliance, or the per-request triple
+          (certificate, token, device posture) for mutual consistency.
+        </t>
+      </section>
+
+      <section anchor="prob-binary" numbered="true">
+        <name>The Binary Outcome Problem</name>
+        <t>
+          The RFC 9470 step-up mechanism <xref target="RFC9470"/> provides a single escalation path:
+          re-authenticate or be denied. No graduated model permits reduced-scope
+          operations while requiring step-up for write/delete operations.
+        </t>
+      </section>
+
+      <section anchor="prob-async" numbered="true">
+        <name>The Asynchronous Signaling Problem</name>
+        <t>
+          OpenID CAEP <xref target="CAEP"/> operates asynchronously and carries only binary
+          <tt>compliant</tt>/<tt>not-compliant</tt> vocabulary. It does not provide per-request
+          synchronous posture assertions or graduated outcome mapping.
+        </t>
+      </section>
+
+      <section anchor="prob-threat-event" numbered="true">
+        <name>The Threat-Event Response Gap (Gap D)</name>
+        <t>
+          Gaps A-C concern posture degradation detectable from device-side attributes.
+          Gap D concerns a fundamentally different class of threat: active cryptographic
+          threat events detected by external network-layer or cryptographic-layer
+          monitors, where:
+        </t>
+        <ol spacing="normal">
+          <li>The device-side posture signal may report clean posture because the device
+          itself is not compromised — the threat is at the network or algorithm level.</li>
+          <li>Standard Consistency View evaluation against the Issuance Posture would
+          produce a Permit outcome, because posture attributes have not degraded.</li>
+          <li>Nevertheless, the session or token is under active threat that warrants
+          an immediate graduated outcome — minimally Method Restriction or Full Denial
+          — to limit exposure.</li>
+        </ol>
+        <t>
+          Examples of Gap D threat events:
+        </t>
+        <ul spacing="normal">
+          <li><strong>HNDL Interception Signal:</strong> A network traffic analysis system detects that
+          a client session's TLS records have been bulk-captured by a passive adversary.
+          The device is uncompromised; the posture signal is clean. But the access
+          tokens exchanged in that session are at risk of future decryption once a
+          CRQC becomes available.</li>
+          <li><strong>Algorithm-Agility Trigger:</strong> A certificate authority revokes an entire
+          algorithm family (e.g., all ECDSA P-256 certificates) due to a discovered
+          vulnerability. Tokens bound to certificates in that family carry a
+          <tt>cnf/x5t#S256</tt> binding whose underlying key security is now in question,
+          but the token itself has not expired and the device posture is clean.</li>
+          <li><strong>Cryptographic Oracle Event:</strong> A side-channel or fault-injection attack
+          capability is publicly disclosed that can recover private key material from
+          a specific hardware security module model used in client certificate issuance.
+          Devices using that HSM model have clean device posture signals but are at
+          elevated risk.</li>
+        </ul>
+        <t>
+          None of the mechanisms in Gaps A-C, RFC 9470, RFC 9396, or CAEP provides a
+          normative pathway for an external Threat-Event Signal to drive an immediate,
+          per-request APM graduated outcome against an otherwise-valid Consistency View.
+        </t>
+      </section>
+
+    </section>
+
+    <!-- Section 4: Requirements -->
+    <section anchor="requirements" numbered="true">
+      <name>Requirements</name>
+
+      <t>
+        Requirements REQ-1 through REQ-10 are carried forward from draft-vicente-oauth-apm-02
+        without modification. This revision adds REQ-11 and REQ-12 to address Gap D.
+      </t>
+
+      <t>
+        <strong>REQ-1: Per-Request Triple Assembly.</strong>
+        For each Privileged Request, the enforcing entity SHOULD assemble a Consistency
+        View comprising the client certificate or DPoP key thumbprint, the bound access
+        token claims, and an integrity-protected device-posture signal.
+      </t>
+
+      <t>
+        <strong>REQ-2: Issuance Posture Recording.</strong>
+        At token issuance, the AS SHOULD record the security posture as the Issuance
+        Posture associated with the token.
+      </t>
+
+      <t>
+        <strong>REQ-3: Consistency Evaluation.</strong>
+        The enforcing entity SHOULD evaluate the Consistency View against the Issuance
+        Posture synchronously with request processing.
+      </t>
+
+      <t>
+        <strong>REQ-4: Graduated Outcome Production.</strong>
+        The enforcing entity SHOULD produce graduated outcomes: Permit, Scope Reduction,
+        Method Restriction, or Full Denial.
+      </t>
+
+      <t>
+        <strong>REQ-5: Method-Level Restriction.</strong>
+        Method Restriction SHOULD be a distinct outcome class, expressible in HTTP
+        methods and <xref target="RFC9396"/> <tt>actions</tt>.
+      </t>
+
+      <t>
+        <strong>REQ-6: Scope Reduction.</strong>
+        Scope Reduction MUST be implemented at the RS/PEP layer without modifying
+        the access token.
+      </t>
+
+      <t>
+        <strong>REQ-7: Deterministic Outcome Mapping.</strong>
+        A deployment SHOULD define a deterministic, auditable policy mapping posture
+        degradation dimensions to outcome classes.
+      </t>
+
+      <t>
+        <strong>REQ-8: Integrity-Protected Posture Signal.</strong>
+        The device-posture signal MUST be integrity-protected. The signing authority
+        SHOULD be distinct from the client.
+      </t>
+
+      <t>
+        <strong>REQ-9: Backward Compatibility with RFC 8705 and RFC 9449.</strong>
+        An APM mechanism MUST NOT weaken existing sender-constraining bindings.
+        Unknown APM parameters MUST be ignored by non-APM implementations.
+      </t>
+
+      <t>
+        <strong>REQ-10: Non-Interference with Token Revocation.</strong>
+        A Scope Reduction or Method Restriction outcome MUST NOT be interpreted as
+        a token revocation event per <xref target="RFC7009"/>.
+      </t>
+
+      <t>
+        <strong>REQ-11: Threat-Event Integration.</strong>
+        An APM mechanism SHOULD define a Threat-Event Integration channel by which
+        an external network-layer or cryptographic-layer monitor can deliver a
+        Threat-Event Signal to the enforcing entity (RS or PEP). The Threat-Event
+        Signal MUST:
+      </t>
+      <ol spacing="normal">
+        <li>Be integrity-protected by a trust anchor independent of the client.</li>
+        <li>Identify the specific token (<tt>jti</tt>), session (TLS session identifier),
+        client identifier (<tt>sub</tt> and <tt>cnf</tt>), or algorithm family to which the
+        threat applies.</li>
+        <li>Include a threat event type (e.g., <tt>hndl_interception</tt>,
+        <tt>algorithm_deprecation</tt>, <tt>cryptographic_oracle</tt>) from a registered
+        vocabulary.</li>
+        <li>Include an <tt>iat</tt> and <tt>exp</tt> defining the window during which the
+        Threat-Event Signal is considered active.</li>
+      </ol>
+      <t>
+        When a Threat-Event Signal is active and applies to a Privileged Request,
+        the enforcing entity SHOULD override the posture-degradation-based outcome
+        class with the threat-event-based outcome class if the threat-event-based
+        class is more restrictive. The Threat-Event Signal outcome MUST NOT be used
+        to relax an outcome that posture degradation has already escalated.
+      </t>
+      <t>
+        The Threat-Event Integration channel MAY be:
+      </t>
+      <ul spacing="normal">
+        <li>An asynchronous push from a Security Information and Event Management (SIEM)
+        or network analysis platform to the RS/PEP, populating a local threat-event
+        cache keyed by token <tt>jti</tt>, session ID, or client <tt>cnf</tt> thumbprint.</li>
+        <li>A synchronous per-request lookup by the RS/PEP to a Threat Intelligence
+        Service (TIS) for the current token or session.</li>
+        <li>A signed extension claim in the APM-Posture JWT delivered by a posture
+        attestation service that also has visibility into threat intelligence feeds.</li>
+      </ul>
+
+      <t>
+        <strong>REQ-12: Algorithm-Agility Trigger.</strong>
+        An APM mechanism SHOULD define an Algorithm-Agility Trigger as a subclass of
+        Threat Event (REQ-11) that fires when:
+      </t>
+      <ol spacing="normal">
+        <li>The algorithm family used in the <tt>cnf/x5t#S256</tt> certificate binding
+        (<xref target="RFC8705"/>) or the <tt>cnf/jkt</tt> DPoP key binding (<xref target="RFC9449"/>) is
+        deprecated by a competent authority (CA, national standards body, IETF WG
+        consensus), OR</li>
+        <li>A cryptographic weakness in the specific key type used in the bound
+        certificate or DPoP key is publicly disclosed at a severity level meeting
+        a deployment-defined threshold.</li>
+      </ol>
+      <t>
+        Upon receiving an Algorithm-Agility Trigger, the enforcing entity SHOULD
+        escalate the outcome class for requests bound to the affected algorithm family
+        to at minimum Method Restriction, and SHOULD issue a response that carries
+        a <tt>WWW-Authenticate</tt> challenge including an <tt>alg_upgrade_required</tt> error
+        code (see <xref target="iana-error-codes"/>) advising the client to re-enroll with
+        a compliant algorithm family.
+      </t>
+      <t>
+        An Algorithm-Agility Trigger MUST NOT be used to weaken the sender-constraint
+        binding verification step (REQ-9). Verification of the existing <tt>cnf</tt> binding
+        MUST still succeed before APM processing proceeds, even when an
+        Algorithm-Agility Trigger is active.
+      </t>
+
+    </section>
+
+    <!-- Section 5: Mechanism -->
+    <section anchor="mechanism" numbered="true">
+      <name>Mechanism</name>
+
+      <section anchor="mech-overview" numbered="true">
+        <name>Overview</name>
+        <t>
+          The APM mechanism operates at three points in the OAuth request lifecycle:
+          Token Issuance (AS records Issuance Posture); Request Processing (RS/PEP
+          assembles Consistency View including Threat-Event Signal per REQ-11, evaluates,
+          determines outcome); and Outcome Conveyance (RS/PEP returns structured
+          response enabling client recovery).
+        </t>
+      </section>
+
+      <section anchor="mech-assembly" numbered="true">
+        <name>Consistency View Assembly</name>
+        <t>
+          The Consistency View is assembled per-request at the enforcement boundary.
+          Its components are: the Certificate or DPoP Key Component (existing RFC 8705 /
+          RFC 9449 verification); the Token Claims Component; the Device-Posture Signal
+          Component; and, when REQ-11 is implemented, the Threat-Event Signal Component.
+        </t>
+        <t>
+          <strong>Threat-Event Signal Component (Gap D / REQ-11):</strong>
+          The enforcing entity checks its threat-event cache or queries the Threat
+          Intelligence Service for any active Threat-Event Signal applicable to:
+        </t>
+        <ul spacing="normal">
+          <li>The token <tt>jti</tt> of the presented access token;</li>
+          <li>The TLS session identifier of the current connection;</li>
+          <li>The <tt>cnf</tt> key thumbprint or certificate thumbprint; or</li>
+          <li>The algorithm family of the <tt>cnf</tt> key or certificate.</li>
+        </ul>
+        <t>
+          If an active Threat-Event Signal is found, it is included in the Consistency
+          View as an additional degradation dimension with a severity class determined
+          by the Threat Event type (see <xref target="mech-threat-event-severity"/>).
+        </t>
+      </section>
+
+      <section anchor="mech-issuance-posture" numbered="true">
+        <name>Issuance Posture Recording</name>
+        <t>
+          At token issuance, the AS records the security posture of the requesting client
+          as the Issuance Posture via Strategy A (token claim <tt>apm_posture</tt>) or
+          Strategy B (server-side metadata per token <tt>jti</tt>). The <tt>apm_posture</tt> claim
+          structure is unchanged from draft-vicente-oauth-apm-02.
+        </t>
+      </section>
+
+      <section anchor="mech-evaluation" numbered="true">
+        <name>Consistency Evaluation</name>
+        <t>
+          Consistency evaluation proceeds in the following order:
+        </t>
+        <ol spacing="normal">
+          <li>Sender constraint verification (RFC 8705 / RFC 9449).</li>
+          <li>Posture signal verification.</li>
+          <li>Issuance Posture retrieval.</li>
+          <li>Degradation vector computation (device-posture dimensions).</li>
+          <li>Threat-Event Signal lookup (Gap D).</li>
+          <li>Combined outcome class determination: the more restrictive of (a) the
+          posture-degradation-based outcome and (b) the threat-event-based outcome.</li>
+        </ol>
+      </section>
+
+      <section anchor="mech-threat-event-severity" numbered="true">
+        <name>Threat-Event Severity Classes</name>
+        <t>
+          Threat Event types map to minimum outcome classes as follows. Deployment
+          policy MAY escalate but MUST NOT reduce below these minimums:
+        </t>
+        <ul spacing="normal">
+          <li><t><strong>hndl_interception</strong>: Minimum outcome class is Method Restriction
+          (read-only operations only). Full Denial is RECOMMENDED for write and
+          delete operations against high-sensitivity resources.</t></li>
+          <li><t><strong>algorithm_deprecation</strong>: Minimum outcome class is Method Restriction.
+          Response MUST include <tt>alg_upgrade_required</tt> error.
+          See REQ-12.</t></li>
+          <li><t><strong>cryptographic_oracle</strong>: Minimum outcome class is Full Denial.
+          The session SHOULD be terminated and the token SHOULD be revoked via
+          <xref target="RFC7009"/>.</t></li>
+        </ul>
+      </section>
+
+      <section anchor="mech-outcomes" numbered="true">
+        <name>Graduated Outcome Application</name>
+        <t>
+          The four outcome classes are ordered by increasing restrictiveness:
+          Permit &lt; Scope Reduction &lt; Method Restriction &lt; Full Denial.
+          The combined evaluation in <xref target="mech-evaluation"/> step 6 selects the more
+          restrictive of the posture-degradation-based and threat-event-based outcome
+          classes. Outcome conveyance follows the formats defined in
+          <xref target="message-formats"/>.
+        </t>
+      </section>
+
+    </section>
+
+    <!-- Section 6: Message Formats -->
+    <section anchor="message-formats" numbered="true">
+      <name>Message Formats</name>
+
+      <section anchor="fmt-issuance-posture" numbered="true">
+        <name>Issuance Posture Claim</name>
+        <t>
+          The <tt>apm_posture</tt> claim structure is unchanged from draft-vicente-oauth-apm-02.
+          Sub-fields: <tt>posture_at</tt> (REQUIRED NumericDate), <tt>posture_hash</tt> (OPTIONAL
+          base64url digest), <tt>posture_alg</tt> (OPTIONAL, REQUIRED if posture_hash present),
+          <tt>posture_ref</tt> (OPTIONAL URI).
+        </t>
+        <figure anchor="fig-token-posture-claim">
+          <name>JWT Access Token with apm_posture Claim</name>
+          <sourcecode type="json"><![CDATA[
+{
+  "iss": "https://as.example.com",
+  "sub": "user@example.com",
+  "aud": "https://rs.example.com",
+  "exp": 1800000000,
+  "iat": 1799996400,
+  "jti": "aB3xQ9pR",
+  "cnf": {
+    "jkt": "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs"
+  },
+  "scope": "records:read records:write",
+  "apm_posture": {
+    "posture_at": 1799996400,
+    "posture_hash": "Y2Fj...base64url-truncated",
+    "posture_alg": "S256",
+    "posture_ref": "https://as.example.com/posture/aB3xQ9pR"
+  }
+}
+          ]]></sourcecode>
+        </figure>
+      </section>
+
+      <section anchor="fmt-threat-event-signal" numbered="true">
+        <name>Threat-Event Signal Format (REQ-11)</name>
+        <t>
+          A Threat-Event Signal is a signed JWT whose payload MUST contain:
+        </t>
+        <dl newline="true" spacing="normal">
+          <dt><tt>iat</tt>:</dt>
+          <dd>(REQUIRED) Issuance time of the Threat-Event Signal.</dd>
+
+          <dt><tt>exp</tt>:</dt>
+          <dd>(REQUIRED) Expiry of the Threat-Event Signal. RS/PEP MUST NOT apply a
+          Threat-Event Signal past its <tt>exp</tt>.</dd>
+
+          <dt><tt>threat_type</tt>:</dt>
+          <dd>(REQUIRED) A string identifying the threat event type from the registered
+          vocabulary: <tt>hndl_interception</tt>, <tt>algorithm_deprecation</tt>, or
+          <tt>cryptographic_oracle</tt>. Additional values MAY be registered per
+          <xref target="iana-threat-types"/>.</dd>
+
+          <dt><tt>threat_scope</tt>:</dt>
+          <dd>(REQUIRED) A JSON object identifying what the threat applies to. One or more
+          of: <tt>jti</tt> (token ID), <tt>sub</tt> (subject), <tt>cnf_jkt</tt> (DPoP key thumbprint),
+          <tt>cnf_x5t</tt> (certificate thumbprint), <tt>alg_family</tt> (algorithm family
+          string such as <tt>EC/P-256</tt> or <tt>RSA/2048</tt>).</dd>
+
+          <dt><tt>min_outcome</tt>:</dt>
+          <dd>(OPTIONAL) The minimum outcome class the issuer recommends for requests
+          matching this threat scope. Values: <tt>scope_reduction</tt>,
+          <tt>method_restriction</tt>, <tt>full_denial</tt>. If absent, the enforcing entity
+          applies the default minimum for the <tt>threat_type</tt> per
+          <xref target="mech-threat-event-severity"/>.</dd>
+        </dl>
+        <figure anchor="fig-threat-event-signal">
+          <name>Threat-Event Signal JWT Payload (HNDL Example)</name>
+          <sourcecode type="json"><![CDATA[
+{
+  "iat": 1799996400,
+  "exp": 1800082800,
+  "threat_type": "hndl_interception",
+  "threat_scope": {
+    "sub": "user@example.com",
+    "cnf_jkt": "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs"
+  },
+  "min_outcome": "method_restriction"
+}
+          ]]></sourcecode>
+        </figure>
+        <figure anchor="fig-alg-trigger-signal">
+          <name>Threat-Event Signal JWT Payload (Algorithm-Agility Trigger Example)</name>
+          <sourcecode type="json"><![CDATA[
+{
+  "iat": 1799996400,
+  "exp": 1800601200,
+  "threat_type": "algorithm_deprecation",
+  "threat_scope": {
+    "alg_family": "EC/P-256"
+  },
+  "min_outcome": "method_restriction"
+}
+          ]]></sourcecode>
+        </figure>
+      </section>
+
+      <section anchor="fmt-cv-headers" numbered="true">
+        <name>Consistency View Request Headers</name>
+        <t>
+          The APM-Posture JWT header name and structure are unchanged from
+          draft-vicente-oauth-apm-02. Required claims: <tt>iat</tt>, <tt>jti</tt>, <tt>sub</tt>, <tt>ath</tt>.
+          Freshness window: 60 seconds RECOMMENDED.
+        </t>
+      </section>
+
+      <section anchor="fmt-error-responses" numbered="true">
+        <name>Graduated Outcome Error Responses</name>
+
+        <section anchor="fmt-scope-reduction-resp" numbered="true">
+          <name>Scope Reduction Response (unchanged from -02)</name>
+          <sourcecode><![CDATA[
+HTTP/1.1 403 Forbidden
+WWW-Authenticate: Bearer realm="example",
+  error="apm_scope_reduced",
+  error_description="Authorization posture degraded; effective scope reduced",
+  scope="records:read"
+          ]]></sourcecode>
+        </section>
+
+        <section anchor="fmt-method-restriction-resp" numbered="true">
+          <name>Method Restriction Response (unchanged from -02)</name>
+          <sourcecode><![CDATA[
+HTTP/1.1 403 Forbidden
+WWW-Authenticate: Bearer realm="example",
+  error="apm_method_restricted",
+  error_description="Authorization posture degraded; method not permitted",
+  allowed_methods="GET HEAD OPTIONS"
+          ]]></sourcecode>
+        </section>
+
+        <section anchor="fmt-alg-upgrade-resp" numbered="true">
+          <name>Algorithm-Agility Trigger Response (REQ-12, new in -03)</name>
+          <sourcecode><![CDATA[
+HTTP/1.1 403 Forbidden
+WWW-Authenticate: Bearer realm="example",
+  error="alg_upgrade_required",
+  error_description="Token binding uses deprecated algorithm family; re-enroll with compliant algorithm",
+  allowed_methods="GET HEAD OPTIONS"
+          ]]></sourcecode>
+          <t>
+            Clients receiving <tt>alg_upgrade_required</tt> MUST NOT retry the denied method
+            without re-enrolling with a certificate or key using a non-deprecated
+            algorithm family. Clients SHOULD surface a user-facing notification
+            indicating that a security upgrade is required.
+          </t>
+        </section>
+
+        <section anchor="fmt-full-denial-resp" numbered="true">
+          <name>Full Denial Response (unchanged from -02)</name>
+          <sourcecode><![CDATA[
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer realm="example",
+  error="insufficient_authorization_posture",
+  error_description="Authorization posture degraded below minimum threshold"
+          ]]></sourcecode>
+        </section>
+
+      </section>
+
+    </section>
+
+    <!-- Section 7: Security Considerations -->
+    <section anchor="security" numbered="true">
+      <name>Security Considerations</name>
+
+      <t>
+        Security considerations from draft-vicente-oauth-apm-02 (confused-deputy hazard,
+        posture replay, downgrade-forcing attack, side-channel, introspection interaction,
+        non-weakening of RFC 8705 binding, posture signal trust anchors) apply without
+        modification. The following additional considerations apply to Gap D mechanisms.
+      </t>
+
+      <section anchor="sec-threat-event-integrity" numbered="true">
+        <name>Threat-Event Signal Integrity and Trust</name>
+        <t>
+          Threat-Event Signals drive outcome escalation independent of device posture.
+          A forged or replayed Threat-Event Signal can cause denial-of-service by
+          forcing Method Restriction or Full Denial outcomes for legitimate requests.
+          Mitigations:
+        </t>
+        <ol spacing="normal">
+          <li>Threat-Event Signals MUST be signed by a trust anchor independent of
+          the client and, ideally, independent of the RS. The signing authority
+          SHOULD be a dedicated Threat Intelligence Service with an independently
+          verifiable certificate chain.</li>
+          <li>RS/PEP implementations MUST validate <tt>exp</tt> and MUST reject expired
+          Threat-Event Signals.</li>
+          <li>RS/PEP implementations SHOULD maintain a seen-<tt>jti</tt> cache for
+          Threat-Event Signal JWTs to prevent replay within the signal's validity
+          window.</li>
+          <li>The Threat-Event Integration channel (push or pull) MUST be protected
+          by TLS per <xref target="RFC8446"/>.</li>
+        </ol>
+      </section>
+
+      <section anchor="sec-hndl-detection" numbered="true">
+        <name>Limitations of HNDL Detection</name>
+        <t>
+          HNDL interception is, by definition, passive — the adversary captures traffic
+          without actively interfering. Network-layer HNDL detection is probabilistic
+          and relies on traffic analysis heuristics (e.g., anomalous bulk capture
+          signatures, timing analysis). False positives may cause Method Restriction
+          outcomes for legitimate sessions. Deployments implementing REQ-11 MUST
+          document the detection methodology and false-positive rate in their
+          deployment's security policy and communicate the implications to end users.
+        </t>
+      </section>
+
+      <section anchor="sec-alg-trigger-dos" numbered="true">
+        <name>Algorithm-Agility Trigger as Denial-of-Service Vector</name>
+        <t>
+          A broad Algorithm-Agility Trigger scoped to a widely deployed algorithm family
+          (e.g., all EC/P-256 keys) would cause Method Restriction outcomes for all
+          clients using that algorithm family simultaneously, constituting a
+          deployment-wide denial of write and delete operations. Deployments MUST:
+        </t>
+        <ol spacing="normal">
+          <li>Restrict the authority to issue Algorithm-Agility Triggers to a small,
+          well-audited set of trust anchors.</li>
+          <li>Implement rate limiting on the frequency of Algorithm-Agility Triggers
+          applicable to a given algorithm family.</li>
+          <li>Define a migration pathway that allows clients to re-enroll with a
+          compliant algorithm without full loss of access, using Scope Reduction
+          rather than Full Denial as an intermediate step where operationally
+          feasible.</li>
+        </ol>
+      </section>
+
+    </section>
+
+    <!-- Section 8: IANA Considerations -->
+    <section anchor="iana" numbered="true">
+      <name>IANA Considerations</name>
+
+      <section anchor="iana-error-codes" numbered="true">
+        <name>OAuth Extensions Error Registry</name>
+        <t>
+          This document requests registration of the following error codes in the
+          OAuth Extensions Error Registry (<xref target="RFC6749"/> §11.4):
+        </t>
+        <ul spacing="normal">
+          <li><t><strong>apm_scope_reduced</strong>: Used in <tt>WWW-Authenticate</tt> headers to indicate
+          a Scope Reduction graduated outcome.</t></li>
+          <li><t><strong>apm_method_restricted</strong>: Used in <tt>WWW-Authenticate</tt> headers to
+          indicate a Method Restriction graduated outcome.</t></li>
+          <li><t><strong>insufficient_authorization_posture</strong>: Used in <tt>WWW-Authenticate</tt>
+          headers to indicate a Full Denial graduated outcome due to posture
+          degradation or Threat Event.</t></li>
+          <li><t><strong>alg_upgrade_required</strong>: Used in <tt>WWW-Authenticate</tt> headers to
+          indicate a Method Restriction outcome triggered by an Algorithm-Agility
+          Trigger (REQ-12, Gap D, new in -03).</t></li>
+        </ul>
+      </section>
+
+      <section anchor="iana-threat-types" numbered="true">
+        <name>APM Threat Event Type Registry (New in -03)</name>
+        <t>
+          This document requests creation of the "APM Threat Event Type" registry.
+          Initial values:
+        </t>
+        <ul spacing="normal">
+          <li><t><strong>hndl_interception</strong>: Harvest-Now-Decrypt-Later passive traffic
+          capture event. Minimum outcome: Method Restriction.</t></li>
+          <li><t><strong>algorithm_deprecation</strong>: Algorithm family deprecation by competent
+          authority. Minimum outcome: Method Restriction with alg_upgrade_required.
+          See REQ-12.</t></li>
+          <li><t><strong>cryptographic_oracle</strong>: Public disclosure of cryptographic attack
+          capability against key type in use. Minimum outcome: Full Denial.</t></li>
+        </ul>
+        <t>
+          Future values may be registered by Specification Required process per
+          <xref target="RFC8126"/>.
+        </t>
+      </section>
+
+      <section anchor="iana-claims" numbered="true">
+        <name>JSON Web Token Claims Registry</name>
+        <t>
+          This document requests registration of the following JWT claims in the
+          JSON Web Token Claims Registry (<xref target="RFC7519"/> §10.1):
+        </t>
+        <ul spacing="normal">
+          <li><t><strong>apm_posture</strong>: Authorization Posture Mechanism issuance posture
+          claim (unchanged from -02).</t></li>
+          <li><t><strong>threat_type</strong>: APM Threat-Event Signal threat type (new in -03).</t></li>
+          <li><t><strong>threat_scope</strong>: APM Threat-Event Signal scope object (new in -03).</t></li>
+          <li><t><strong>min_outcome</strong>: APM Threat-Event Signal minimum outcome class
+          (new in -03).</t></li>
+        </ul>
+      </section>
+
+    </section>
+
+  </middle>
+
+  <back>
+
+    <references title="Normative References">
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.2119.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6749.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7009.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7519.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7518.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7662.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8126.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8174.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8446.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8705.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9396.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9449.xml"/>
+      <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9470.xml"/>
+    </references>
+
+    <references title="Informative References">
+      <reference anchor="NIST.SP.800-207">
+        <front>
+          <title>Zero Trust Architecture</title>
+          <author><organization>NIST</organization></author>
+          <date year="2020" month="August"/>
+        </front>
+        <seriesInfo name="NIST Special Publication" value="800-207"/>
+      </reference>
+
+      <reference anchor="CAEP">
+        <front>
+          <title>OpenID Continuous Access Evaluation Profile 1.0</title>
+          <author><organization>OpenID Foundation</organization></author>
+          <date year="2022"/>
+        </front>
+      </reference>
+
+      <reference anchor="SHOR1994">
+        <front>
+          <title>Algorithms for quantum computation: discrete logarithms and factoring</title>
+          <author initials="P." surname="Shor" fullname="Peter W. Shor"/>
+          <date year="1994"/>
+        </front>
+        <seriesInfo name="Proceedings of the 35th Annual Symposium on Foundations of Computer Science" value="pp. 124-134"/>
+      </reference>
+
+      <reference anchor="GROVER1996">
+        <front>
+          <title>A fast quantum mechanical algorithm for database search</title>
+          <author initials="L." surname="Grover" fullname="Lov K. Grover"/>
+          <date year="1996"/>
+        </front>
+        <seriesInfo name="Proceedings of the 28th Annual ACM Symposium on Theory of Computing" value="pp. 212-219"/>
+      </reference>
+
+      <reference anchor="FIPS204">
+        <front>
+          <title>Module-Lattice-Based Digital Signature Standard</title>
+          <author><organization>NIST</organization></author>
+          <date year="2024" month="August"/>
+        </front>
+        <seriesInfo name="FIPS" value="204"/>
+      </reference>
+
+      <reference anchor="I-D.ietf-oauth-attestation-based-client-auth">
+        <front>
+          <title>OAuth 2.0 Attestation-Based Client Authentication</title>
+          <author initials="T." surname="Lodderstedt"/>
+          <author initials="P." surname="Kasselman"/>
+          <date year="2024"/>
+        </front>
+        <seriesInfo name="Internet-Draft" value="draft-ietf-oauth-attestation-based-client-auth"/>
+      </reference>
+    </references>
+
+  </back>
+
+</rfc>
