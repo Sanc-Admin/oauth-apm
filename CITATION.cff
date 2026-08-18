@@ -8,7 +8,7 @@ authors:
 title: "OAuth Adaptive Posture Management (APM)"
 version: "01"
 date-released: "2026-06-08"
-url: "https://github.com/Sanc-Admin/oauth-apm"
+url: "https://github.com/sanctumsecopsmssp/oauth-apm"
 license: CC-BY-4.0
 keywords:
   - IETF
