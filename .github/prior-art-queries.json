@@ -1,0 +1,15 @@
+{
+  "repo": "oauth-apm",
+  "subject": "Authorization Posture Mechanism (APM) for OAuth 2.0: per-request Consistency View evaluated against the Issuance Posture, producing graduated least-privilege outcomes, plus threat-event and algorithm-agility triggers.",
+  "exclude_name_contains": ["-vicente-"],
+  "queries": [
+    {"label": "title contains 'authorization posture'", "filters": {"title__icontains": "authorization posture"}},
+    {"label": "title contains 'device posture'", "filters": {"title__icontains": "device posture"}},
+    {"label": "title contains 'step-up authentication'", "filters": {"title__icontains": "step-up authentication"}},
+    {"label": "title contains 'continuous access evaluation'", "filters": {"title__icontains": "continuous access evaluation"}},
+    {"label": "name contains 'oauth-step-up-authn'", "filters": {"name__contains": "oauth-step-up-authn"}},
+    {"label": "name contains 'oauth-attestation-based-client-auth'", "filters": {"name__contains": "oauth-attestation-based-client-auth"}},
+    {"label": "OAUTH WG drafts whose title mentions posture", "filters": {"group__acronym": "oauth", "title__icontains": "posture"}},
+    {"label": "OAUTH WG drafts whose title mentions attestation", "filters": {"group__acronym": "oauth", "title__icontains": "attestation"}}
+  ]
+}

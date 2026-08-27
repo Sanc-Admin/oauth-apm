@@ -1,0 +1,48 @@
+{
+  "seen": {
+    "draft-bertocci-oauth-step-up-authn-challenge": {
+      "rev": "01",
+      "title": "OAuth 2.0 Step-up Authentication Challenge Protocol",
+      "wg": "none",
+      "first_seen": "2026-08-27T19:56:07Z",
+      "last_seen_rev_at": "2026-08-27T19:56:07Z"
+    },
+    "draft-ietf-oauth-attestation-based-client-auth": {
+      "rev": "10",
+      "title": "OAuth 2.0 Attestation-Based Client Authentication",
+      "wg": "oauth",
+      "first_seen": "2026-08-27T19:56:07Z",
+      "last_seen_rev_at": "2026-08-27T19:56:07Z"
+    },
+    "draft-ietf-oauth-step-up-authn-challenge": {
+      "rev": "17",
+      "title": "OAuth 2.0 Step Up Authentication Challenge Protocol",
+      "wg": "oauth",
+      "first_seen": "2026-08-27T19:56:07Z",
+      "last_seen_rev_at": "2026-08-27T19:56:07Z"
+    },
+    "draft-looker-oauth-attestation-based-client-auth": {
+      "rev": "00",
+      "title": "OAuth 2.0 Attestation-Based Client Authentication",
+      "wg": "none",
+      "first_seen": "2026-08-27T19:56:07Z",
+      "last_seen_rev_at": "2026-08-27T19:56:07Z"
+    },
+    "draft-schrock-emilia-eye": {
+      "rev": "00",
+      "title": "Verifiable, Scope-Bound Advisories for Authorization Posture (EMILIA Eye)",
+      "wg": "none",
+      "first_seen": "2026-08-27T19:56:07Z",
+      "last_seen_rev_at": "2026-08-27T19:56:07Z"
+    },
+    "draft-wdenniss-oauth-device-posture": {
+      "rev": "01",
+      "title": "OAuth 2.0 Device Posture Signals",
+      "wg": "none",
+      "first_seen": "2026-08-27T19:56:07Z",
+      "last_seen_rev_at": "2026-08-27T19:56:07Z"
+    }
+  },
+  "updated": "2026-08-27T19:56:07Z",
+  "queries_source": ".github/prior-art-queries.json"
+}
